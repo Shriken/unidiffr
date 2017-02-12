@@ -1,6 +1,8 @@
 [package]
-name = "tintr"
+name = "unidiffr"
 version = "0.1.0"
 authors = ["Zane Sterling <sterling.zane@gmail.com>"]
 
 [dependencies]
+chrono = "0.3"
+scan-rules = "0.2"
