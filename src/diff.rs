@@ -11,22 +11,21 @@ use std::error;
 use error::Error;
 
 
+#[derive(Debug, PartialEq)]
 pub struct Unidiff {
     header: DiffHeader,
     chunks: Vec<DiffChunk>,
 }
 
 impl Unidiff {
-    pub fn from(lines: &[String])
+    pub fn from(lines: &[&str])
         -> Result<Unidiff, Box<error::Error>>
     {
         if lines.len() < 2 {
             return Err(From::from("diff misformatted"));
         }
 
-        let from_line = lines[0].clone();
-        let to_line   = lines[1].clone();
-        let header = DiffHeader::from(from_line, to_line)?;
+        let header = DiffHeader::from(lines[0], lines[1])?;
         let mut diff = Unidiff {
             header: header,
             chunks: Vec::new(),
@@ -36,15 +35,90 @@ impl Unidiff {
         let mut chunk = Vec::new();
         for line in &lines[2..] {
             if line.starts_with("@@ ") {
-                if chunk.len() > 0 { diff.chunks.push(DiffChunk::from(&chunk)?); }
+                if chunk.len() > 0 {
+                    diff.chunks.push(DiffChunk::from(&chunk)?);
+                }
                 chunk = Vec::new();
+                chunk.push(line);
             } else {
                 chunk.push(line.as_ref());
             }
         }
+        if chunk.len() > 0 {
+            diff.chunks.push(DiffChunk::from(&chunk)?);
+        }
 
         Ok(diff)
     }
+}
+
+#[test]
+fn unidiff_test_parse() {
+    let file_text = "\
+--- a/foo/bar/baz\t1981-03-14 01:23:45.010101 +0800
++++ b/foo/baz\t2030-03-14 01:23:45.010101 +0600
+@@ -1,3 +1,4 @@
+ abc
+-def
++egh
++ijk
+ lmn
+@@ -6,3 +6,4 @@
+ why
+-aer
++are
++you
+ reading\
+    ";
+    let lines = file_text.split('\n').collect::<Vec<_>>();
+    let parsed_diff = Unidiff::from(&lines).unwrap();
+
+    use chrono::FixedOffset;
+    use chrono::offset::TimeZone;
+    let diff = Unidiff {
+        header: DiffHeader {
+            from_file: "a/foo/bar/baz".to_string(),
+            to_file:   "b/foo/baz".to_string(),
+            from_file_mod_datetime: FixedOffset::east(8 * 3600)
+                .ymd(1981, 3, 14)
+                .and_hms_nano(01, 23, 45, 010101000),
+            to_file_mod_datetime:   FixedOffset::east(6 * 3600)
+                .ymd(2030, 3, 14)
+                .and_hms_nano(01, 23, 45, 010101000),
+        },
+
+        chunks: vec![
+            DiffChunk {
+                pre_start_line:  1,
+                pre_num_lines:   3,
+                post_start_line: 1,
+                post_num_lines:  4,
+                lines: vec![
+                    (LineAction::Keep,   "abc".to_string()),
+                    (LineAction::Remove, "def".to_string()),
+                    (LineAction::Add,    "egh".to_string()),
+                    (LineAction::Add,    "ijk".to_string()),
+                    (LineAction::Keep,   "lmn".to_string()),
+                ],
+            },
+
+            DiffChunk {
+                pre_start_line:  6,
+                pre_num_lines:   3,
+                post_start_line: 6,
+                post_num_lines:  4,
+                lines: vec![
+                    (LineAction::Keep,   "why".to_string()),
+                    (LineAction::Remove, "aer".to_string()),
+                    (LineAction::Add,    "are".to_string()),
+                    (LineAction::Add,    "you".to_string()),
+                    (LineAction::Keep,   "reading".to_string()),
+                ],
+            },
+        ],
+    };
+
+    assert_eq!(diff, parsed_diff);
 }
 
 
@@ -58,7 +132,7 @@ pub struct DiffHeader {
 }
 
 impl DiffHeader {
-    pub fn from(from_line: String, to_line: String)
+    pub fn from(from_line: &str, to_line: &str)
         -> Result<DiffHeader, Box<error::Error>>
     {
         let_scan!(&from_line; (
@@ -117,8 +191,8 @@ fn diff_header_test_parse() {
     };
 
     let parsed_header = DiffHeader::from(
-        format!("--- {} {}", from_file, from_datetime_str),
-        format!("+++ {} {}", to_file, to_datetime_str),
+        format!("--- {} {}", from_file, from_datetime_str).as_ref(),
+        format!("+++ {} {}", to_file, to_datetime_str).as_ref(),
     ).unwrap();
 
     assert_eq!(header, parsed_header);
