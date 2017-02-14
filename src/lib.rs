@@ -1,7 +1,7 @@
 extern crate chrono;
 #[macro_use] extern crate scan_rules;
 
-mod diff;
+pub mod diff;
 mod error;
 
 
