@@ -1,3 +1,4 @@
+use std::error;
 use std::fmt;
 use std::fmt::Display;
 
@@ -18,3 +19,6 @@ impl Display for Error {
     }
 }
 
+impl error::Error for Error {
+    fn description(&self) -> &str { self.message.as_ref() }
+}

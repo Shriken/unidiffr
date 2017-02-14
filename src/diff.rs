@@ -1,10 +1,11 @@
 use chrono;
 use chrono::DateTime;
-use chrono::offset::TimeZone;
-use chrono::offset::fixed::FixedOffset;
 
-use scan_rules::scanner::NonSpace;
-use scan_rules::scanner::Everything;
+use scan_rules::scanner::{
+    Everything,
+    NonSpace,
+    Space,
+};
 
 use std::error;
 use error::Error;
@@ -13,6 +14,37 @@ use error::Error;
 pub struct Unidiff {
     header: DiffHeader,
     chunks: Vec<DiffChunk>,
+}
+
+impl Unidiff {
+    pub fn from(lines: &[String])
+        -> Result<Unidiff, Box<error::Error>>
+    {
+        if lines.len() < 2 {
+            return Err(From::from("diff misformatted"));
+        }
+
+        let from_line = lines[0].clone();
+        let to_line   = lines[1].clone();
+        let header = DiffHeader::from(from_line, to_line)?;
+        let mut diff = Unidiff {
+            header: header,
+            chunks: Vec::new(),
+        };
+
+        // Extract and parse chunks.
+        let mut chunk = Vec::new();
+        for line in &lines[2..] {
+            if line.starts_with("@@ ") {
+                if chunk.len() > 0 { diff.chunks.push(DiffChunk::from(&chunk)?); }
+                chunk = Vec::new();
+            } else {
+                chunk.push(line.as_ref());
+            }
+        }
+
+        Ok(diff)
+    }
 }
 
 
@@ -32,13 +64,13 @@ impl DiffHeader {
         let_scan!(&from_line; (
             "--- ",
             let from_file: NonSpace,
-            " ",
+            let _: Space,
             let from_datetime_string: Everything
         ));
         let_scan!(&to_line; (
             "+++ ",
             let to_file: NonSpace,
-            " ",
+            let _: Space,
             let to_datetime_string: Everything
         ));
 
@@ -62,6 +94,9 @@ impl DiffHeader {
 
 #[test]
 fn diff_header_test_parse() {
+    use chrono::FixedOffset;
+    use chrono::offset::TimeZone;
+
     let from_file = "a/foo/bar/baz";
     let to_file   = "a/foo/baz";
     let from_datetime_str = "1981-03-14 01:23:45.010101 +0800";
@@ -101,7 +136,7 @@ pub struct DiffChunk {
 }
 
 impl DiffChunk {
-    pub fn from(text_lines: &[String]) -> Result<DiffChunk, Error> {
+    pub fn from(text_lines: &[&str]) -> Result<DiffChunk, Error> {
         assert!(text_lines.len() > 0);
 
         // Parse header line.
@@ -170,11 +205,7 @@ fn diff_chunk_test_parse() {
         ],
     };
 
-    let from_chunk_res = DiffChunk::from(
-        &chunk_lines[..].iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>()
-    );
+    let from_chunk_res = DiffChunk::from(&chunk_lines[..]);
     assert!(from_chunk_res.is_ok());
     let from_chunk = from_chunk_res.unwrap();
     assert_eq!(diff_chunk, from_chunk);
