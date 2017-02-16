@@ -1,8 +1,10 @@
 extern crate chrono;
 #[macro_use] extern crate scan_rules;
 
-pub mod diff;
+mod diff;
 mod error;
+
+pub use diff::Unidiff;
 
 
 #[cfg(test)]

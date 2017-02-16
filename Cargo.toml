@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Zane Sterling <sterling.zane@gmail.com>"]
 
 [dependencies]
+clap = "2.20.3"
 chrono = "0.3"
 scan-rules = "0.2"
