@@ -1,6 +1,6 @@
 [package]
 name = "unidiffr"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Zane Sterling <sterling.zane@gmail.com>"]
 
 [dependencies]
